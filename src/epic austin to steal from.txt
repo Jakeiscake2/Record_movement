@@ -1,0 +1,302 @@
+#include "main.h"
+#include "pros/misc.h"
+
+// initialize stuff
+using namespace pros;
+bool intake_spinning = false;
+bool flywheel_spinning = false;
+bool intake_front = true;
+bool endgame = false;
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+pros::Motor flywheel_motor(18);
+pros::Motor flywheel_motor2(19, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor indexer(9, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor roller_intake(17, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor front_left(1, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor front_right(13, pros::E_MOTOR_GEARSET_18, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor back_left(15, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor back_right(16, pros::E_MOTOR_GEARSET_18, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor expansion(2);
+pros::ADIUltrasonic ultrasonic(1, 2);
+
+/**
+ * Runs initialization code. This occurs as soon as the program is started.
+ *
+ * All other competition modes are blocked by initialize; it is recommended
+ * to keep execution time for this mode under a few seconds.
+ */
+void initialize()
+{
+    pros::lcd::initialize();
+    pros::delay(500); // Stop the user from doing anything while legacy ports configure.
+    indexer.tare_position();
+    indexer.move_relative(160, 100);
+}
+
+/**
+ * Runs while the robot is in the disabled state of Field Management System or
+ * the VEX Competition Switch, following either autonomous or opcontrol. When
+ * the robot is enabled, this task will exit.
+ */
+void disabled()
+{
+}
+
+/**
+ * Runs after initialize(), and before autonomous when connected to the Field
+ * Management System or the VEX Competition Switch. This is intended for
+ * competition-specific initialization routines, such as an autonomous selector
+ * on the LCD.
+ *
+ * This task will exit when the robot is enabled and autonomous or opcontrol
+ * starts.
+ */
+void competition_initialize()
+{
+}
+
+/**
+ * Runs the user autonomous code. This function will be started in its own task
+ * with the default priority and stack size whenever the robot is enabled via
+ * the Field Management System or the VEX Competition Switch in the autonomous
+ * mode. Alternatively, this function may be called in initialize or opcontrol
+ * for non-competition testing purposes.
+ *
+ * If the robot is disabled or communications is lost, the autonomous task
+ * will be stopped. Re-enabling the robot will restart the task, not re-start it
+ * from where it left off.
+ */
+
+void autonomous()
+{
+    // Set motors to hold.  This helps autonomous consistency.
+    front_left.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    back_left.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    front_right.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    back_right.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    roller_intake.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    indexer.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+
+    // Auto code
+}
+
+/**
+ * Runs the operator control code. This function will be started in its own task
+ * with the default priority and stack size whenever the robot is enabled via
+ * the Field Management System or the VEX Competition Switch in the operator
+ * control mode.
+ *
+ * If no competition control is connected, this function will run immediately
+ * following initialize().
+ *
+ * If the robot is disabled or communications is lost, the
+ * operator control task will be stopped. Re-enabling the robot will restart the
+ * task, not resume it from where it left off.
+ **/
+
+void opcontrol()
+{
+    // This is preference to what you like to drive on.
+    roller_intake.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+    front_left.set_brake_mode(E_MOTOR_BRAKE_COAST);
+    back_left.set_brake_mode(E_MOTOR_BRAKE_COAST);
+    front_right.set_brake_mode(E_MOTOR_BRAKE_COAST);
+    back_right.set_brake_mode(E_MOTOR_BRAKE_COAST);
+    expansion.set_brake_mode(E_MOTOR_BRAKE_COAST);
+    indexer.set_brake_mode(E_MOTOR_BRAKE_HOLD);
+
+    // loop for auto code
+    while (true)
+    {
+        if (ultrasonic.get_value() > 2000)
+        {
+            pros::lcd::set_text(1, "good");
+        }
+        else
+        {
+            pros::lcd::set_text(1, "bad   ");
+        }
+
+        // drivetrain
+        int x, y;
+        x = -(controller.get_analog(E_CONTROLLER_ANALOG_LEFT_X));
+        y = -(controller.get_analog(E_CONTROLLER_ANALOG_LEFT_Y));
+
+        int maximum = max(abs(y), abs(x));
+        int total = y + x;
+        int difference = y - x;
+
+        int xr, yr;
+        xr = -(controller.get_analog(E_CONTROLLER_ANALOG_RIGHT_X));
+        yr = -(controller.get_analog(E_CONTROLLER_ANALOG_RIGHT_Y));
+
+        int maximumr = max(abs(yr), abs(xr));
+        int totalr = yr + xr;
+        int differencer = yr - xr;
+
+        if (y == 0 && x == 0 && yr == 0 && xr == 0)
+        {
+            front_left.brake();
+            front_right.brake();
+            back_left.brake();
+            back_right.brake();
+        }
+        else if (y >= 0)
+        {
+            if (x >= 0)
+            {
+                front_left = maximum;
+                back_left = maximum;
+                front_right = difference;
+                back_right = difference;
+            }
+            else
+            {
+                front_left = total;
+                back_left = total;
+                front_right = maximum;
+                back_right = maximum;
+            }
+        }
+        else
+        {
+            if (x >= 0)
+            {
+                front_left = total;
+                back_left = total;
+                front_right = -maximum;
+                back_right = -maximum;
+            }
+            else
+            {
+                front_left = -maximum;
+                back_left = -maximum;
+                front_right = difference;
+                back_right = difference;
+            }
+        }
+        if (yr == 0 && xr == 0 && y == 0 && x == 0)
+        {
+            front_left.brake();
+            front_right.brake();
+            back_left.brake();
+            back_right.brake();
+        }
+        else if (yr >= 0)
+        {
+            if (xr >= 0)
+            {
+                front_left = -maximum;
+                back_left = -maximum;
+                front_right = -difference;
+                back_right = -difference;
+            }
+            else
+            {
+                front_left = -total;
+                back_left = -total;
+                front_right = -maximum;
+                back_right = -maximum;
+            }
+        }
+        else
+        {
+            if (xr >= 0)
+            {
+                front_left = -total;
+                back_left = -total;
+                front_right = maximum;
+                back_right = maximum;
+            }
+            else
+            {
+                front_left = maximum;
+                back_left = maximum;
+                front_right = -difference;
+                back_right = -difference;
+            }
+        }
+
+        // intake toggle
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_A) && intake_spinning == false)
+        {
+            roller_intake.move(127);
+            intake_spinning = true;
+            pros::delay(250);
+        }
+        else if (controller.get_digital(E_CONTROLLER_DIGITAL_A) && intake_spinning)
+        {
+            roller_intake.brake();
+            intake_spinning = false;
+            pros::delay(250);
+        }
+
+        // flywheel toggle
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_L1) && flywheel_spinning == false)
+        {
+            flywheel_motor.move(127);
+            flywheel_motor2.move(127);
+            flywheel_spinning = true;
+            pros::delay(500);
+        }
+        else if (controller.get_digital(E_CONTROLLER_DIGITAL_L1) && flywheel_spinning == true)
+        {
+            flywheel_motor.brake();
+            flywheel_motor2.brake();
+            flywheel_spinning = false;
+            pros::delay(500);
+        }
+
+        // indexer
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_L2))
+        {
+            indexer.move_relative(360, 127);
+            pros::delay(500);
+        }
+
+        // roller switch, 2 directions (HOLD)
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_R1))
+        {
+            roller_intake.move(100);
+            intake_spinning = false;
+        }
+        else if (controller.get_digital(E_CONTROLLER_DIGITAL_R2))
+        {
+            roller_intake.move(-100);
+            intake_spinning = false;
+        }
+        else if (intake_spinning == false)
+        {
+            roller_intake.brake();
+        }
+
+        // set drive direction
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_UP))
+        {
+            intake_front = false;
+        }
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_DOWN))
+        {
+            intake_front = true;
+        }
+
+        // expansion maybe?
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_RIGHT))
+        {
+            expansion.move(100);
+        }
+        else if (controller.get_digital(E_CONTROLLER_DIGITAL_LEFT))
+        {
+            expansion.move(-100);
+        }
+        else
+        {
+            expansion.brake();
+        }
+
+        if (controller.get_digital(E_CONTROLLER_DIGITAL_Y))
+        {
+        }
+        pros::delay(50);
+    }
+}
